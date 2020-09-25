@@ -1,5 +1,3 @@
-#include <SPI.h>
-#include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
@@ -18,10 +16,7 @@
 
 //Rotary Stuff
 #define encoderPinA 2
-#define interruptPinA 0
-
 #define encoderPinB 3
-#define interruptPinA 1
 
 #define encoderBtn 7
 #define backBtn 8
@@ -30,6 +25,8 @@
 // for rotating
 volatile boolean A_set = false;            
 volatile boolean B_set = false;
+volatile int encPos = 0;
+volatile int lastEncPos = 0;
 
 //the buttons are PulledUp so set them high
 int encoderVal = 1;
@@ -39,7 +36,8 @@ int backVal = 1;
 int lastBackVal = 1;
 
 //Screen
-int screen = 0;
+volatile int screen = 0;
+volatile int screenpos = 0;
 
 //Our main Variables
 int set_current=1120;
@@ -62,20 +60,22 @@ void setup() {
   pinMode(encoderPinB, INPUT_PULLUP); 
   
   //THE INTERRUPTS
-  attachInterrupt(0, doEncoderA, CHANGE); // encoder pin on interrupt 0 (pin 2)
-  attachInterrupt(1, doEncoderB, CHANGE); // encoder pin on interrupt 1 (pin 3)
+  attachInterrupt(digitalPinToInterrupt(encoderPinA), doEncoderA, CHANGE); // encoder pin on interrupt 0 (pin 2)
+  attachInterrupt(digitalPinToInterrupt(encoderPinB), doEncoderB, CHANGE); // encoder pin on interrupt 1 (pin 3)
   
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
     for(;;); // Don't proceed, loop forever
   }
 
   //diplay init
+  display.setTextColor(SSD1306_WHITE);
   display.display();
   delay(1);
   display.clearDisplay();
 
   // Screen Main start
-  Screen_Main(0);
+  //Screen_Main();
+  Screen_setCurrent();
 }
 
 void loop()
@@ -93,14 +93,22 @@ void loop()
     lastBackVal = backVal;
     if (backVal == 0)
       back();
-  }  
+  }
+
+  if (encPos != lastEncPos){
+    Serial.println("IND: " + encPos);
+    if(encPos > lastEncPos) higher();
+    else lower();
+    lastEncPos = encPos;
+  }
 }
 
-void Screen_Main(int pos) {
+void Screen_Main() {
+  
   display.clearDisplay();
   display.setTextSize(2);
   
-  display.drawCircle(CircleRad + 1, ((pos==0) ? Line1 : Line2 )+ CircleRad, CircleRad, SSD1306_WHITE);
+  display.drawCircle(CircleRad + 1, ((screenpos==0) ? Line1 : Line2 )+ CircleRad, CircleRad, SSD1306_WHITE);
   
   display.setCursor(TextStart,Line1);
   display.print("C-Current");
@@ -110,24 +118,29 @@ void Screen_Main(int pos) {
 
   display.display();
   delay(1);
+
 }
 
-void Screen_SetCurrent() {
+void Screen_setCurrent() {
   display.clearDisplay();
-  display.setTextSize(2);
-  
-  display.drawCircle(CircleRad + 1, Line1 + CircleRad, CircleRad, SSD1306_WHITE);
-  
-  display.setCursor(TextStart,Line1);
+  display.setTextSize(1);
+  display.setCursor(TextStart - CircleRad * 2,Line1);
   display.print("Set: ");
-  display.print(set_current);
-  display.print("mA");
   
-  display.setCursor(TextStart - CircleRad,Line2);
+  display.setTextSize(2);
+  display.print(set_current);
+  display.setTextSize(1);
+  display.print("mA");
+
+  display.setTextSize(2);
+  display.setCursor(0,Line2);
   display.print(is_voltage);
-  display.print("V");
-  display.print("  ");
+  display.setTextSize(1);
+  display.print("mV");
+  display.print(" ");
+  display.setTextSize(2);
   display.print(is_current);
+  display.setTextSize(1);
   display.print("mA");
 
   display.display();
@@ -138,29 +151,37 @@ void Screen_SetCurrent() {
 //Iterrupt on A changing state
 void doEncoderA(){
   if(B_set){
-    lower();
     B_set = false;
     A_set = false;
+    encPos-=1;
   }
   else{
     A_set = true;
-  } 
+    B_set = false;
+  }
 }
 
 // Interrupt on B changing state, same as A above
 void doEncoderB(){
   if(A_set){
-    higher();
     B_set = false;
     A_set = false;
+    encPos+=1;
   }
   else{
+    A_set = false;
     B_set = true;
   }
 }
 
 //THE ACTIONS
 void ok(){
+  switch(screen){
+     case 0: 
+             if (screenpos == 0)
+                Screen_setCurrent();
+             break;
+  }
   
 }
 
@@ -169,10 +190,21 @@ void back(){
 }
 
 void higher(){
+  
   switch(screen){
-    case 0: 
+     case 0: 
+             screenpos = (screenpos + 1) % 2;
+             Screen_Main();
+             break;
   }
+
 }
 
 void lower(){
+  switch(screen){
+     case 0:
+            screenpos = (screenpos -1) % 2;
+            Screen_Main();
+            break;
+  }
 }
