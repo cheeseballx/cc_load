@@ -9,8 +9,9 @@
 
 //Screen Values
 #define TextStart 20
+#define UnderscoreStart 30
 #define Line1 16
-#define Line2 40
+#define HalfLineHight 8
 #define CircleRad 6
 
 
@@ -38,6 +39,7 @@ int lastBackVal = 1;
 //Screen
 volatile int screen = 0;
 volatile int screenpos = 0;
+volatile int screenval = 0;
 
 //Our main Variables
 int set_current=1120;
@@ -50,6 +52,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 
 void setup() {
+  //Serial.begin(9600);
 
   //THE BUTTONS
   pinMode(encoderBtn,INPUT_PULLUP);
@@ -108,13 +111,16 @@ void Screen_Main() {
   display.clearDisplay();
   display.setTextSize(2);
   
-  display.drawCircle(CircleRad + 1, ((screenpos==0) ? Line1 : Line2 )+ CircleRad, CircleRad, SSD1306_WHITE);
+  display.drawCircle(CircleRad + 1, (Line1 + HalfLineHight*2*screenpos )+ CircleRad, CircleRad, SSD1306_WHITE);
   
   display.setCursor(TextStart,Line1);
   display.print("C-Current");
   
-  display.setCursor(TextStart,Line2);
+  display.setCursor(TextStart,Line1 + 2*HalfLineHight);
   display.print("C-Power");
+
+  display.setCursor(TextStart,Line1 + 4*HalfLineHight);
+  display.print("C-Resistance");
 
   display.display();
   delay(1);
@@ -124,7 +130,7 @@ void Screen_Main() {
 void Screen_setCurrent() {
   display.clearDisplay();
   display.setTextSize(1);
-  display.setCursor(TextStart - CircleRad * 2,Line1);
+  display.setCursor(0,Line1);
   display.print("Set: ");
   
   display.setTextSize(2);
@@ -133,7 +139,11 @@ void Screen_setCurrent() {
   display.print("mA");
 
   display.setTextSize(2);
-  display.setCursor(0,Line2);
+  display.setCursor(UnderscoreStart + screenpos*25,Line1 + HalfLineHight);
+  display.print("__");
+
+  display.setTextSize(2);
+  display.setCursor(0,Line1 + 4*HalfLineHight);
   display.print(is_voltage);
   display.setTextSize(1);
   display.print("mV");
@@ -177,34 +187,62 @@ void doEncoderB(){
 //THE ACTIONS
 void ok(){
   switch(screen){
+     
      case 0: 
              if (screenpos == 0)
-                Screen_setCurrent();
+                screen=1;
+             break;
+     case 1: 
+             screenpos = (screenpos +1) % 2;
+             screen=1;
              break;
   }
-  
+
+  redraw();
 }
 
 void back(){
-  
+  screen=0;
+  screenpos=0;             
+
+  redraw();
 }
 
 void higher(){
   
   switch(screen){
      case 0: 
-             screenpos = (screenpos + 1) % 2;
-             Screen_Main();
+             screenpos = (screenpos + 1) % 3;
+             screen=0;
+             break;
+     case 1:
+             screenval += 1;
+             set_current +=1;
              break;
   }
+
+  redraw();
 
 }
 
 void lower(){
   switch(screen){
      case 0:
-            screenpos = (screenpos -1) % 2;
-            Screen_Main();
+            screenpos = (screenpos +2) % 3;
+            screen=0;
             break;
+     case 1:
+            screenval += 1;
+            set_current -=1;
+            break;
+  }
+
+  redraw();
+}
+
+void redraw(){
+  switch(screen){
+    case 0: Screen_Main(); break;
+    case 1: Screen_setCurrent(); break;
   }
 }
