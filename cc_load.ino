@@ -14,6 +14,12 @@
 #define HalfLineHight 8
 #define CircleRad 6
 
+//Screens
+#define SC_MAIN 0
+#define SC_SETCUR 1
+#define SC_SETPOW 2
+#define SC_SETRES 3
+
 
 //Rotary Stuff
 #define encoderPinA 2
@@ -37,12 +43,11 @@ int backVal = 1;
 int lastBackVal = 1;
 
 //Screen
-volatile int screen = 0;
+volatile int screen = SC_MAIN;
 volatile int screenpos = 0;
-volatile int screenval = 0;
 
 //Our main Variables
-int set_current=1120;
+volatile int set_current=1120;
 int is_current=1221;
 int is_voltage=1200;
 
@@ -72,13 +77,8 @@ void setup() {
 
   //diplay init
   display.setTextColor(SSD1306_WHITE);
-  display.display();
-  delay(1);
-  display.clearDisplay();
-
-  // Screen Main start
-  //Screen_Main();
-  Screen_setCurrent();
+  
+  redraw();
 }
 
 void loop()
@@ -120,7 +120,7 @@ void Screen_Main() {
   display.print("C-Power");
 
   display.setCursor(TextStart,Line1 + 4*HalfLineHight);
-  display.print("C-Resistance");
+  display.print("C-Ohm");
 
   display.display();
   delay(1);
@@ -137,6 +137,67 @@ void Screen_setCurrent() {
   display.print(set_current);
   display.setTextSize(1);
   display.print("mA");
+
+  display.setTextSize(2);
+  display.setCursor(UnderscoreStart + screenpos*25,Line1 + HalfLineHight);
+  display.print("__");
+
+  display.setTextSize(2);
+  display.setCursor(0,Line1 + 4*HalfLineHight);
+  display.print(is_voltage);
+  display.setTextSize(1);
+  display.print("mV");
+  display.print(" ");
+  display.setTextSize(2);
+  display.print(is_current);
+  display.setTextSize(1);
+  display.print("mA");
+
+  display.display();
+  delay(1);
+}
+
+
+void Screen_setPower() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(0,Line1);
+  display.print("Set: ");
+  
+  display.setTextSize(2);
+  display.print(set_current);
+  display.setTextSize(1);
+  display.print("mW");
+
+  display.setTextSize(2);
+  display.setCursor(UnderscoreStart + screenpos*25,Line1 + HalfLineHight);
+  display.print("__");
+
+  display.setTextSize(2);
+  display.setCursor(0,Line1 + 4*HalfLineHight);
+  display.print(is_voltage);
+  display.setTextSize(1);
+  display.print("mV");
+  display.print(" ");
+  display.setTextSize(2);
+  display.print(is_current);
+  display.setTextSize(1);
+  display.print("mA");
+
+  display.display();
+  delay(1);
+}
+
+void Screen_setResistance() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(0,Line1);
+  display.print("Set: ");
+  
+  display.setTextSize(2);
+  display.print(set_current);
+  display.setTextSize(1);
+  display.print("mO");
 
   display.setTextSize(2);
   display.setCursor(UnderscoreStart + screenpos*25,Line1 + HalfLineHight);
@@ -184,17 +245,33 @@ void doEncoderB(){
   }
 }
 
+
+
 //THE ACTIONS
 void ok(){
   switch(screen){
      
-     case 0: 
-             if (screenpos == 0)
-                screen=1;
+     case SC_MAIN: 
+             if (screenpos == 0){
+                screenpos = 1;
+                screen=SC_SETCUR;
+             }
+             else if (screenpos == 1){
+                screenpos = 1;
+                screen=SC_SETPOW;
+             }
+             else if (screenpos == 2){
+                screenpos = 1;
+                screen=SC_SETRES;
+             }    
+             else 
+                screenpos = 0;
              break;
-     case 1: 
+     case SC_SETCUR:
+     case SC_SETPOW:
+     case SC_SETRES: 
              screenpos = (screenpos +1) % 2;
-             screen=1;
+             screen=SC_SETCUR;
              break;
   }
 
@@ -211,13 +288,15 @@ void back(){
 void higher(){
   
   switch(screen){
-     case 0: 
+     case SC_MAIN: 
              screenpos = (screenpos + 1) % 3;
-             screen=0;
              break;
-     case 1:
-             screenval += 1;
-             set_current +=1;
+     case SC_SETCUR:
+     case SC_SETPOW:
+     case SC_SETRES:
+             //Not sure if it would be better to if else but i think math is always better
+             //this just means +100 if screenpos=0 and +1 if screenpos=1
+             set_current += (-99 * screenpos + 100);  
              break;
   }
 
@@ -229,11 +308,11 @@ void lower(){
   switch(screen){
      case 0:
             screenpos = (screenpos +2) % 3;
-            screen=0;
             break;
-     case 1:
-            screenval += 1;
-            set_current -=1;
+     case SC_SETCUR:
+     case SC_SETPOW:
+     case SC_SETRES:
+            set_current -= (-99 * screenpos + 100); //see comment from function Higer()
             break;
   }
 
@@ -242,7 +321,9 @@ void lower(){
 
 void redraw(){
   switch(screen){
-    case 0: Screen_Main(); break;
-    case 1: Screen_setCurrent(); break;
+    case SC_MAIN: Screen_Main(); break;
+    case SC_SETCUR: Screen_setCurrent(); break;
+    case SC_SETPOW: Screen_setPower(); break;
+    case SC_SETRES: Screen_setResistance(); break;
   }
 }
